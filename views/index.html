@@ -11,7 +11,7 @@
 
   </div>
 </div>
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAkarjA8hlysMC5aK7ywsrUwYY6UwpnXG0&sensor=true"></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAmC7W1ZfamFRWQgPy1ApuHWouCmDcRXwg&sensor=true"></script>
 <script>
 function initialize_gmaps() {
     // initialize new google maps LatLng object
@@ -34,10 +34,127 @@ function initialize_gmaps() {
     });
     // Add the marker to the map by calling setMap()
     marker.setMap(map);
+    return map;
+}
+    
+function get_current_day() {
+    var currHref = $('#days').children('li.active').children('a')[0].href.toString();
+    return currHref[currHref.length - 1];
 }
 
 $(document).ready(function() {
-    initialize_gmaps();
+    var map = initialize_gmaps();
+    var markers = [new Object({hotels: [], restaurants: [], activities: []})];
+    var days = 1;
+    var maxDays = 5;
+    var currDay = 1;
+    var dayText = ['One', 'Two', 'Three', 'Four', 'Five'];
+    
+    $('.form-group').on('click', 'button', function() {
+        var $myForm = $(this).parents('.form-group');
+        var category = $myForm.find('select')[0].dataset.category;
+        var itemId = $myForm.find('select option:selected').val();
+        var categoryVar;
+        
+        if (category === 'Hotels') categoryVar = hotels;
+        else if (category === 'Restaurants') categoryVar = restaurants;
+        else if (category === 'Activities') categoryVar = activities;
+        
+        var myObj = categoryVar.filter(function(obj) {
+            return obj._id.toString() === itemId;
+        })[0];
+        
+        var name = myObj.name;
+        var lat = myObj.place.location[0];
+        var lng = myObj.place.location[1];
+        
+        var currDay = get_current_day();
+        
+        $('#tab'+currDay).find('.'+category.toLowerCase()+'-list').append('<li id="'+itemId+'">'+name+'</li><button class="btn btn-danger">X</button>');
+        
+        var myLatlng = new google.maps.LatLng(lat,lng);
+        var marker = new google.maps.Marker({
+            position: myLatlng,
+            title: name
+        });
+        markers[currDay-1][category.toLowerCase()].push(marker);
+        marker.setMap(map);
+    });
+    
+    $('#trip-itinerary').on('click', 'button', function(){
+        var $item = $(this).prev('li');
+        var currDay = get_current_day();
+        
+        var category = '';
+        if ($item.parents('ul').hasClass('hotels-list')) category = 'hotels';
+        else if ($item.parents('ul').hasClass('restaurants-list')) category = 'restaurants';
+        else if ($item.parents('ul').hasClass('activities-list')) category = 'activities';
+        
+        var myMarker = markers[currDay-1][category].filter(function(obj) {
+            return obj.title === $item.text();
+        })[0];
+        console.log(myMarker);
+        console.log(markers);
+        
+        myMarker.setMap(null);
+        
+        var i = markers[currDay-1][category].indexOf(myMarker);
+        if (i !== -1) markers[currDay-1][category].splice(i, 1);
+        
+        $item.remove();
+        $(this).remove();
+    });
+    
+    $('#add-day').on('click', function() {
+        if (days === maxDays) return;
+        
+        days++;
+        
+        markers.push(new Object({hotels: [], restaurants: [], activities: []}));
+        $('#days').append('<li id="day'+days+'"><a href="#tab'+days+'" data-toggle="tab">'+dayText[days-1]+'</a></li>');
+        var itineraryDayDiv = $('<div id="tab'+days+'" style="display: none;">Hotels<ul class="hotels-list"></ul>Restaurants<ul class="restaurants-list"></ul>Activities<ul class="activities-list"></ul></div>')
+        itineraryDayDiv.hide();
+        $('#trip-itinerary').append(itineraryDayDiv)
+    });
+    $('#remove-day').on('click', function() {
+        if (days === 1) return;
+        console.log(days);
+        var categories = ['hotels', 'restaurants', 'activities'];
+        
+        categories.forEach(function(category) {
+            markers[days-1][category].forEach(function(marker) {
+                marker.setMap(null);
+            });
+        });
+        
+        markers.pop();
+        $('#day'+days).remove();
+        $('#tab'+days).remove();
+        $('#day1').addClass('active');
+        $('#tab1').show();
+        days--;
+    });
+    $('#days').on('click', 'li', function() {
+        if ($(this).hasClass('active')) return;
+        
+        $('#days').children('li.active').removeClass('active');
+        $(this).addClass('active');
+        
+        var activeDay = get_current_day();
+        
+        $('#trip-itinerary').children('div').hide();
+        $('#tab'+activeDay).show();
+        
+    });
+    
 });
+</script>
+<script>
+  {% autoescape false %}
+  // note to instructors: next iteration, change `all_xyz` to `templateXyz`
+  var hotels = {{ hotels | json }};
+  var restaurants = {{ restaurants | json }};
+  var activities = {{ activities | json }};
+  {% endautoescape %}
 </script>
 {% endblock %}
